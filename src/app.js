@@ -17,7 +17,11 @@ app.use(express.static("public"));
 app.use(cookieParser());
 
 import router from "./routes/user.routes.js";
+import messagerouter from "./routes/message.routes.js";
+import chatrouter from "./routes/caht.routes.js";
 
 app.use("/api/v1/users", router);
+app.use("/api/v1/message", messagerouter);
+app.use("/api/v1/chat", chatrouter);
 
 export { app };

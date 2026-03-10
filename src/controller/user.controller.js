@@ -76,14 +76,14 @@ const registeruser = asynchandler(async (req, res) => {
 });
 
 const loginuser =asynchandler(async (req,res) => {
-  const {email,username,password} = req.body;
+  const {email,password} = req.body;
 
-  if((!email||username)) {
+  if((!email)) {
     throw new Apierror(401, "email or username not found")
   }
 
   const Existeduser = await User.findOne({
-    $or : [{email}, {username}],
+    $or : [{email}],
   })
 
   if(!Existeduser) {
@@ -197,4 +197,22 @@ try {
   }
 });
 
-export { registeruser,loginuser,logout,getCurrentUser,refreshAccesstoken };
+const getallusers = asynchandler(async (req, res) => {
+
+  let filter = { _id: { $ne: req.user._id } };
+
+  if (req.query.search) {
+    filter.$or = [
+      { username: { $regex: req.query.search, $options: "i" } },
+      { fullname: { $regex: req.query.search, $options: "i" } }
+    ];
+  }
+
+  const users = await User.find(filter).select("-password");
+
+  res.status(200).json(new ApiResponse(200, {users}, "all users"))
+});
+
+
+
+export { registeruser,loginuser,logout,getCurrentUser,refreshAccesstoken,getallusers };
