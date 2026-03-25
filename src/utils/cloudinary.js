@@ -15,8 +15,8 @@ const uploaodoncloudinary = async (localpath) => {
     const response = await cloudinary.uploader.upload(localpath, {
       folder: "chatapp",
       resource_type: "auto",
-    });   
-        console.log("file is uploaded on cloudinary ", response);
+    });
+    console.log("file is uploaded on cloudinary ", response);
     fs.unlinkSync(localpath);
     return response;
   } catch (error) {

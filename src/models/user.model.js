@@ -15,6 +15,10 @@ const userSchema = new Schema(
     refreshtoken: {
       type: String,
     },
+    lastSeen: {
+      type: Date,
+      default: null,
+    },
     email: {
       type: String,
       required: true,

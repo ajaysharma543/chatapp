@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Mongoose } from "mongoose";
 import { Chat } from "../models/chat.model.js";
 import { Apierror } from "../utils/apierror.js";
 import { asynchandler } from "../utils/asynchandler.js";
@@ -8,12 +8,13 @@ const accesschat = asynchandler(async (req, res) => {
   const { userid } = req.body;
 
   if (!userid) {
-    throw new Apierror(404, "userid not found");
+    throw new Apierror(400, "userid not provided");
   }
 
   const chat = await Chat.aggregate([
     {
       $match: {
+        isGroup: false,
         members: {
           $all: [
             new mongoose.Types.ObjectId(req.user._id),
@@ -25,21 +26,61 @@ const accesschat = asynchandler(async (req, res) => {
     {
       $lookup: {
         from: "users",
-        localField: "members",   // ✅ FIXED
+        localField: "members",
         foreignField: "_id",
         as: "members",
+      },
+    },
+
+    {
+      $lookup: {
+        from: "messages",
+        localField: "lastMessage",
+        foreignField: "_id",
+        as: "lastMessage",
+      },
+    },
+
+    {
+      $unwind: {
+        path: "$lastMessage",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    {
+      $lookup: {
+        from: "users",
+        localField: "lastMessage.sender",
+        foreignField: "_id",
+        as: "lastMessage.sender",
+      },
+    },
+
+    {
+      $unwind: {
+        path: "$lastMessage.sender",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    {
+      $project: {
+        "members.password": 0,
+        "members.refreshtoken": 0,
+        "members.__v": 0,
+        "lastMessage.sender.password": 0,
+        "lastMessage.sender.refreshtoken": 0,
+        "lastMessage.sender.__v": 0,
       },
     },
   ]);
 
   if (chat.length > 0) {
-    return res
-      .status(200)
-      .json(new ApiResponse(200, chat[0], "chat fetched"));
+    return res.status(200).json(new ApiResponse(200, chat[0], "chat fetched"));
   }
 
   const newChat = await Chat.create({
-    chatName: "sender",
     members: [req.user._id, userid],
   });
 
@@ -52,16 +93,228 @@ const accesschat = asynchandler(async (req, res) => {
     {
       $lookup: {
         from: "users",
-        localField: "members",   // ✅ FIXED
+        localField: "members",
         foreignField: "_id",
         as: "members",
       },
     },
+    {
+      $project: {
+        "members.password": 0,
+        "members.refreshtoken": 0,
+        "members.__v": 0,
+      },
+    },
   ]);
 
-  res
-    .status(200)
-    .json(new ApiResponse(200, createdChat[0], "chat created"));
+  res.status(200).json(new ApiResponse(200, createdChat[0], "chat created"));
 });
 
-export { accesschat };
+const fetchchats = asynchandler(async (req, res) => {
+  const userId = new mongoose.Types.ObjectId(req.user._id);
+  const chats = await Chat.aggregate([
+    {
+      $match: {
+        members: new mongoose.Types.ObjectId(req.user._id),
+      },
+    },
+
+    {
+      $lookup: {
+        from: "users",
+        localField: "members",
+        foreignField: "_id",
+        as: "members",
+      },
+    },
+
+    {
+      $lookup: {
+        from: "messages",
+        localField: "lastMessage",
+        foreignField: "_id",
+        as: "lastMessage",
+      },
+    },
+
+    {
+      $unwind: {
+        path: "$lastMessage",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    {
+      $lookup: {
+        from: "users",
+        localField: "lastMessage.sender",
+        foreignField: "_id",
+        as: "lastMessage.sender",
+      },
+    },
+
+    {
+      $unwind: {
+        path: "$lastMessage.sender",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    {
+      $lookup: {
+        from: "messages",
+        let: { chatId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$chat", "$$chatId"] },
+                  { $ne: ["$sender", userId] },
+                  { $not: { $in: [userId, "$readby"] } },
+                ],
+              },
+            },
+          },
+          {
+            $count: "count",
+          },
+        ],
+        as: "unreadData",
+      },
+    },
+
+    {
+      $addFields: {
+        unreadCount: {
+          $ifNull: [{ $arrayElemAt: ["$unreadData.count", 0] }, 0],
+        },
+      },
+    },
+
+    {
+      $project: {
+        "members.password": 0,
+        "members.refreshtoken": 0,
+        "members.__v": 0,
+        "lastMessage.sender.password": 0,
+        "lastMessage.sender.refreshtoken": 0,
+        "lastMessage.sender.__v": 0,
+        unreadData: 0,
+      },
+    },
+
+    {
+      $sort: {
+        "lastMessage.createdAt": -1,
+        createdAt: -1,
+      },
+    },
+  ]);
+
+  res.status(200).json(new ApiResponse(200, chats, "Chats fetched"));
+});
+
+const creategroupchat = asynchandler(async (req, res) => {
+  const { name, members } = req.body;
+
+  if (!name || !members) {
+    throw new Apierror(400, "Please fill all fields");
+  }
+
+  if (!Array.isArray(members)) {
+    throw new Apierror(400, "Members must be an array");
+  }
+
+  if (members.length < 2) {
+    throw new Apierror(400, "At least 2 members required to create a group");
+  }
+
+  let uniqueMembers = [...new Set(members.map((id) => id.toString()))];
+
+  if (!uniqueMembers.includes(req.user._id.toString())) {
+    uniqueMembers.push(req.user._id.toString());
+  }
+
+  const groupchat = await Chat.create({
+    chatName: name,
+    isGroup: true,
+    members: uniqueMembers,
+    groupAdmin: req.user._id,
+  });
+  const fullGroupChat = await Chat.findById(groupchat._id)
+    .populate("members", "-password -refreshtoken")
+    .populate("groupAdmin", "-password -refreshtoken");
+
+  let chatObj = fullGroupChat.toObject();
+
+  chatObj.members = chatObj.members.filter(
+    (member) => member._id.toString() !== chatObj.groupAdmin._id.toString()
+  );
+
+  const io = req.app.get("io");
+
+  uniqueMembers.forEach((memberId) => {
+    if (memberId.toString() !== req.user._id.toString()) {
+      io.to(memberId.toString()).emit("group_created", chatObj);
+    }
+  });
+  res
+    .status(201)
+    .json(new ApiResponse(201, chatObj, "Group created successfully"));
+});
+
+const renameGroup = asynchandler(async (req, res) => {
+  const { chat, chatName } = req.body;
+
+  if (!chatName || !chatName.trim()) {
+    throw new Apierror(400, "Please enter a valid name");
+  }
+
+  if (!chat) {
+    throw new Apierror(400, "invalid chat id");
+  }
+
+  const existingChat = await Chat.findById(chat);
+
+  if (!existingChat) {
+    throw new Apierror(404, "Group chat not found");
+  }
+
+  if (!existingChat.isGroup) {
+    throw new Apierror(400, "Cannot rename personal chat");
+  }
+
+  if (existingChat.groupAdmin.toString() !== req.user._id.toString()) {
+    throw new Apierror(403, "Only admin can rename the group");
+  }
+
+  const updatedgroupchat = await Chat.findByIdAndUpdate(
+    chat,
+    {
+      chatName: chatName,
+    },
+    {
+      new: true,
+    }
+  );
+
+  if (!updatedgroupchat) {
+    throw new Apierror(400, "group chat not found");
+  }
+
+  const fullGroupChat = await Chat.findById(updatedgroupchat._id)
+    .populate("members", "-password -refreshtoken")
+    .populate("groupAdmin", "-password -refreshtoken");
+
+  let chatObj = fullGroupChat.toObject();
+
+  chatObj.members = chatObj.members.filter(
+    (member) => member._id.toString() !== chatObj.groupAdmin._id.toString()
+  );
+  res
+    .status(200)
+    .json(new ApiResponse(200, chatObj, "name change successfully"));
+});
+
+export { accesschat, fetchchats, creategroupchat, renameGroup };

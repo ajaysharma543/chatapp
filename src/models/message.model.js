@@ -1,34 +1,36 @@
-import mongoose, { Schema }  from "mongoose"
+import mongoose, { Schema } from "mongoose";
 
 const messageSchema = new Schema(
-   {
- sender : {
-    type : mongoose.Schema.Types.ObjectId,
-    ref : "User"
+  {
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
-    content : {
-        type: String,
-        trim: true
+    content: {
+      type: String,
+      trim: true,
     },
-    readby :[
-    {
-    type : mongoose.Schema.Types.ObjectId,
-    ref : "User"
-    }
-],
-    chat : {
-    type : mongoose.Schema.Types.ObjectId,
-    ref : "Chat"
+    isdeleted: {
+      type: Boolean,
+      default: false,
     },
-    image : {
-        type: {
-        public_id: String,
-        url: String,
+    readby: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
       },
-    }
-   },
-   {
-    timestamps : true,
-   }
-)
-export const Message  = mongoose.model("Message", messageSchema)
+    ],
+    chat: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Chat",
+    },
+    image: {
+      public_id: String,
+      url: String,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+export const Message = mongoose.model("Message", messageSchema);
