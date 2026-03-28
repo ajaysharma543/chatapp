@@ -109,13 +109,15 @@ const sendmessage = asynchandler(async (req, res) => {
       },
     },
   ]);
-  const io = req.app.get("io");
-  io.to(messageData[0].chat._id.toString()).emit("new_message", messageData[0]);
+const io = req.app.get("io");
 
-  messageData[0].chat.members.forEach((member) => {
-    io.to(member._id.toString()).emit("new_message", messageData[0]);
-  });
+const chatId = messageData[0].chat._id.toString();
 
+io.to(chatId).emit("new_message", messageData[0]);
+
+messageData[0].chat.members.forEach((member) => {
+  io.to(member._id.toString()).emit("new_message", messageData[0]);
+});
   res
     .status(200)
     .json(new ApiResponse(200, messageData[0], "message created successfully"));
