@@ -27,11 +27,12 @@ connectdatabse()
     io.on("connection", (socket) => {
       // console.log("User connected:", socket.id);
 
-      socket.on("join_user", (userId) => {
-        socket.join(userId);
-        onlineUsers.set(userId, socket.id);
-        socket.broadcast.emit("user_online", userId);
-      });
+    socket.on("join_user", (userId) => {
+  socket.join(userId);
+
+  onlineUsers.set(userId, socket.id);
+  io.emit("all_online_users", Array.from(onlineUsers.keys()));
+});
       socket.on("join_chat", (chatId) => {
         socket.join(chatId.toString());
         // console.log("➡️ Socket", socket.id, "joining chat:", chatId);

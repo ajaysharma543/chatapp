@@ -16,7 +16,7 @@ const uploaodoncloudinary = async (localpath) => {
       folder: "chatapp",
       resource_type: "auto",
     });
-    console.log("file is uploaded on cloudinary ", response);
+    // console.log("file is uploaded on cloudinary ", response);
     fs.unlinkSync(localpath);
     return response;
   } catch (error) {
@@ -25,4 +25,22 @@ const uploaodoncloudinary = async (localpath) => {
   }
 };
 
-export { uploaodoncloudinary };
+
+const deleteOnCloudinary = async function (public_id, resource_type = "image") {
+  try {
+    if (!public_id) return null;
+
+    const result = await cloudinary.uploader.destroy(public_id, {
+      resource_type,
+    });
+
+    // console.log(`Deleted from Cloudinary (${resource_type}):`, result);
+
+    return result;
+  } catch (error) {
+    console.error("Error deleting from Cloudinary:", error);
+    throw new Apierror(400, "Error while deleting the file", error);
+  }
+};
+
+export { uploaodoncloudinary,deleteOnCloudinary };

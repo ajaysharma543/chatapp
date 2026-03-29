@@ -3,8 +3,9 @@ import { User } from "../models/user.model.js";
 import { Apierror } from "../utils/apierror.js";
 import { ApiResponse } from "../utils/apiresponse.js";
 import { asynchandler } from "../utils/asynchandler.js";
-import { uploaodoncloudinary } from "../utils/cloudinary.js";
+import { deleteOnCloudinary, uploaodoncloudinary } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
+
 const registeruser = asynchandler(async (req, res) => {
   const { fullname, username, email, password } = req.body;
 
@@ -217,6 +218,78 @@ const getallusers = asynchandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, { users }, "all users"));
 });
 
+const changeuseravatar = asynchandler(async (req, res) => {
+  if (!req.file) {
+    throw new Apierror(400, "Avatar file is required");
+  }
+
+  const newavatar = req.file.path;
+
+  const avatar = await uploaodoncloudinary(newavatar);
+
+  if (!avatar?.url) {
+    throw new Apierror(400, "Error while uploading avatar");
+  }
+
+  const user = await User.findById(req.user?._id).select("avatar");
+
+  const avatartodelete = user?.avatar?.public_id;
+
+  const updatedavatar = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: {
+          public_id: avatar.public_id,
+          url: avatar.url,
+        },
+      },
+    },
+    { new: true }
+  ).select("-password");
+
+  if (avatartodelete) {
+    try {
+      await deleteOnCloudinary(avatartodelete);
+    } catch (err) {
+      console.log("Old avatar delete failed:", err);
+    }
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, updatedavatar, "Avatar updated successfully")
+  );
+});
+
+const changeaccountdetails = asynchandler(async (req, res) => {
+  const { fullname, username, email, bio, gender } = req.body;
+
+  
+  const updateFields = {};
+
+  if (fullname) updateFields.fullname = fullname;
+  if (username) updateFields.username = username;
+  if (email) updateFields.email = email;
+  if (bio) updateFields.bio = bio;
+  if (gender) updateFields.gender = gender;
+
+ 
+
+  if (Object.keys(updateFields).length === 0) {
+    throw new Apierror(400, "No data to update");
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: updateFields },
+    { new: true }
+  ).select("-password");
+
+  return res.status(200).json(
+    new ApiResponse(200, updatedUser, "Profile updated successfully")
+  );
+})
+
 export {
   registeruser,
   loginuser,
@@ -224,4 +297,6 @@ export {
   getCurrentUser,
   refreshAccesstoken,
   getallusers,
+  changeuseravatar,
+  changeaccountdetails
 };

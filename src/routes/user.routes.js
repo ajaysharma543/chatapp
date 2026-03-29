@@ -1,16 +1,22 @@
 import { Router } from "express";
 import {
+  changeaccountdetails,
+  changeuseravatar,
   getallusers,
   getCurrentUser,
   loginuser,
   logout,
   refreshAccesstoken,
   registeruser,
+  
 } from "../controller/user.controller.js";
+
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyjwt } from "../middlewares/auth.middleware.js";
 
 const router = Router();
+
+/* ================= AUTH ================= */
 
 router.route("/register").post(
   upload.fields([
@@ -21,10 +27,22 @@ router.route("/register").post(
   ]),
   registeruser
 );
+
 router.route("/login").post(loginuser);
 router.route("/logout").post(verifyjwt, logout);
-router.route("/getcurrentuser").get(verifyjwt, getCurrentUser);
 router.route("/refreshtoken").post(refreshAccesstoken);
+
+
+router.route("/getcurrentuser").get(verifyjwt, getCurrentUser);
 router.route("/getallusers").get(verifyjwt, getallusers);
+
+
+router.route("/update-profile").patch(verifyjwt, changeaccountdetails);
+
+router.route("/change-avatar").patch(
+  verifyjwt,
+  upload.single("avatar"),
+  changeuseravatar
+);
 
 export default router;
