@@ -268,9 +268,9 @@ const changeuseravatar = asynchandler(async (req, res) => {
     }
   }
 
-  return res.status(200).json(
-    new ApiResponse(200, updatedavatar, "Avatar updated successfully")
-  );
+return res.status(200).json(
+  new ApiResponse(200, { user: updatedavatar }, "Avatar updated successfully")
+);
 });
 
 
@@ -308,7 +308,7 @@ const changeaccountdetails = asynchandler(async (req, res) => {
   ).select("-password");
 
   return res.status(200).json(
-    new ApiResponse(200, updatedUser, "Profile updated successfully")
+   new ApiResponse(200, { user: updatedUser }, "Profile updated successfully")
   );
 });
 
