@@ -8,6 +8,7 @@ import {
   logout,
   refreshAccesstoken,
   registeruser,
+  removeavatar,
   
 } from "../controller/user.controller.js";
 
@@ -44,5 +45,6 @@ router.route("/change-avatar").patch(
   upload.single("avatar"),
   changeuseravatar
 );
+router.route("/remove-avatar").patch(verifyjwt, removeavatar);
 
 export default router;

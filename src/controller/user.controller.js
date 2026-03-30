@@ -41,7 +41,6 @@ const registeruser = asynchandler(async (req, res) => {
     },
   };
 
-  // ✅ SAFE GENDER CHECK (important)
   if (gender && ["male", "female", "other"].includes(gender)) {
     userData.gender = gender;
   }
@@ -161,9 +160,13 @@ const logout = asynchandler(async (req, res) => {
 });
 
 const getCurrentUser = asynchandler(async (req, res) => {
-  return res
-    .status(200)
-    .json(new ApiResponse(200, req.user, "User fetched successfully"));
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { user: req.user },
+      "User fetched successfully"
+    )
+  );
 });
 const refreshAccesstoken = asynchandler(async (req, res) => {
   const incomingRefreshtoken =
@@ -309,6 +312,41 @@ const changeaccountdetails = asynchandler(async (req, res) => {
   );
 });
 
+const removeavatar = asynchandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new Apierror(404, "User not found");
+  }
+
+  const publicId = user?.avatar?.public_id;
+
+  if (publicId) {
+    try {
+      await deleteOnCloudinary(publicId);
+    } catch (err) {
+      console.log("Avatar delete failed:", err);
+    }
+  }
+
+  const updatedavatar = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        avatar: {
+          public_id: "",
+          url: ""
+        }
+      }
+    },
+    { new: true, runValidators: false }
+  ).select("-password");
+
+  return res.status(200).json(
+    new ApiResponse(200, { user: updatedavatar }, "Avatar removed successfully")
+  );
+});
+
 export {
   registeruser,
   loginuser,
@@ -317,5 +355,6 @@ export {
   refreshAccesstoken,
   getallusers,
   changeuseravatar,
-  changeaccountdetails
+  changeaccountdetails,
+  removeavatar
 };
