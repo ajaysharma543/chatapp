@@ -7,7 +7,7 @@ import { deleteOnCloudinary, uploaodoncloudinary } from "../utils/cloudinary.js"
 import jwt from "jsonwebtoken";
 
 const registeruser = asynchandler(async (req, res) => {
-  const { fullname, username, email, password } = req.body;
+  const { fullname, username, email, password, gender } = req.body;
 
   const existedemail = await User.findOne({
     $or: [{ username }, { email }],
@@ -29,7 +29,8 @@ const registeruser = asynchandler(async (req, res) => {
     throw new Apierror(400, "Avatar file is required");
   }
 
-  const user = await User.create({
+  // 🔥 CLEAN DATA OBJECT
+  const userData = {
     fullname,
     username,
     email,
@@ -38,7 +39,14 @@ const registeruser = asynchandler(async (req, res) => {
       public_id: avatar?.public_id || "",
       url: avatar?.secure_url || "",
     },
-  });
+  };
+
+  // ✅ SAFE GENDER CHECK (important)
+  if (gender && ["male", "female", "other"].includes(gender)) {
+    userData.gender = gender;
+  }
+
+  const user = await User.create(userData);
 
   const { accesstoken, refreshtoken } = await generatetoken(user._id);
 
@@ -49,13 +57,14 @@ const registeruser = asynchandler(async (req, res) => {
   if (!createdUser) {
     throw new Apierror(500, "Something went wrong while registering the user");
   }
+
   const isProduction = process.env.NODE_ENV === "production";
 
   const options = {
     httpOnly: true,
-    secure: isProduction, // HTTPS only
-    sameSite: isProduction ? "none" : "lax", // allow cross-origin in prod
-    maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 10 * 24 * 60 * 60 * 1000,
   };
 
   res
