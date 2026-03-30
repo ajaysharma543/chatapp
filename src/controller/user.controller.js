@@ -261,19 +261,29 @@ const changeuseravatar = asynchandler(async (req, res) => {
   );
 });
 
+
 const changeaccountdetails = asynchandler(async (req, res) => {
   const { fullname, username, email, bio, gender } = req.body;
 
-  
   const updateFields = {};
 
   if (fullname) updateFields.fullname = fullname;
   if (username) updateFields.username = username;
   if (email) updateFields.email = email;
-  if (bio) updateFields.bio = bio;
-  if (gender) updateFields.gender = gender;
 
- 
+  if (bio !== undefined) updateFields.bio = bio;
+
+  if (gender !== undefined) {
+    const allowed = ["male", "female", "other"];
+
+    if (gender === "" || gender === null) {
+      updateFields.gender = null;
+    } else if (allowed.includes(gender)) {
+      updateFields.gender = gender;
+    } else {
+      throw new Apierror(400, "Invalid gender value");
+    }
+  }
 
   if (Object.keys(updateFields).length === 0) {
     throw new Apierror(400, "No data to update");
@@ -282,13 +292,13 @@ const changeaccountdetails = asynchandler(async (req, res) => {
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,
     { $set: updateFields },
-    { new: true }
+    { new: true, runValidators: true } 
   ).select("-password");
 
   return res.status(200).json(
     new ApiResponse(200, updatedUser, "Profile updated successfully")
   );
-})
+});
 
 export {
   registeruser,
