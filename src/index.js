@@ -23,19 +23,25 @@ connectdatabse()
       next();
     });
     app.set("io", io);
-    const onlineUsers = new Map();
-    io.on("connection", (socket) => {
-      // console.log("User connected:", socket.id);
+      const onlineUsers = new Map(); 
 
-    socket.on("join_user", (userId) => {
+    io.on("connection", (socket) => {
+socket.on("join_user", (userId) => {
   socket.join(userId);
 
-  onlineUsers.set(userId, socket.id);
+  if (!onlineUsers.has(userId)) {
+    onlineUsers.set(userId, new Set());
+  }
+
+  onlineUsers.get(userId).add(socket.id);
+
   io.emit("all_online_users", Array.from(onlineUsers.keys()));
+});
+socket.on("get_online_users", () => {
+  socket.emit("all_online_users", Array.from(onlineUsers.keys()));
 });
       socket.on("join_chat", (chatId) => {
         socket.join(chatId.toString());
-        // console.log("➡️ Socket", socket.id, "joining chat:", chatId);
       });
       socket.on("leave_chat", (chatId) => {
         socket.leave(chatId);
@@ -45,6 +51,7 @@ connectdatabse()
       socket.on("typing", ({ chatId, userId }) => {
         socket.to(chatId).emit("typing", { chatId, userId });
       });
+      
 
       socket.on("stop_typing", ({ chatId, userId }) => {
         socket.to(chatId).emit("stop_typing", { chatId, userId });
@@ -63,30 +70,34 @@ connectdatabse()
         });
       });
 
-      socket.on("disconnect", async () => {
-        let disconnectedUser = null;
+     socket.on("disconnect", async () => {
+  let disconnectedUser = null;
 
-        for (let [userId, socketId] of onlineUsers.entries()) {
-          if (socketId === socket.id) {
-            disconnectedUser = userId;
-            onlineUsers.delete(userId);
-            break;
-          }
-        }
+  for (let [userId, socketSet] of onlineUsers.entries()) {
+    if (socketSet.has(socket.id)) {
+      socketSet.delete(socket.id);
 
-        if (disconnectedUser) {
-          const lastSeen = new Date();
+      if (socketSet.size === 0) {
+        onlineUsers.delete(userId);
+        disconnectedUser = userId;
+      }
+      break;
+    }
+  }
 
-          await User.findByIdAndUpdate(disconnectedUser, {
-            lastSeen,
-          });
+  if (disconnectedUser) {
+    const lastSeen = new Date();
 
-          socket.broadcast.emit("user_offline", {
-            userId: disconnectedUser,
-            lastSeen,
-          });
-        }
-      });
+    await User.findByIdAndUpdate(disconnectedUser, {
+      lastSeen,
+    });
+
+    socket.broadcast.emit("user_offline", {
+      userId: disconnectedUser,
+      lastSeen,
+    });
+  }
+});
     });
     server.listen(process.env.PORT || 4000, () => {
       console.log(

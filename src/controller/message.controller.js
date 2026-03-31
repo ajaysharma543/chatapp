@@ -116,7 +116,17 @@ const chatId = messageData[0].chat._id.toString();
 io.to(chatId).emit("new_message", messageData[0]);
 
 messageData[0].chat.members.forEach((member) => {
-  io.to(member._id.toString()).emit("new_message", messageData[0]);
+  const memberId = member._id.toString();
+  const senderId = req.user._id.toString();
+
+  if (memberId === senderId) return;
+
+  io.to(memberId).emit("new_message", messageData[0]);
+
+  io.to(memberId).emit("new_notification", {
+    sender: messageData[0].sender,
+    message: messageData[0],
+  });
 });
   res
     .status(200)
