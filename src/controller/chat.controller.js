@@ -307,14 +307,137 @@ const renameGroup = asynchandler(async (req, res) => {
     .populate("members", "-password -refreshtoken")
     .populate("groupAdmin", "-password -refreshtoken");
 
-  let chatObj = fullGroupChat.toObject();
 
-  chatObj.members = chatObj.members.filter(
-    (member) => member._id.toString() !== chatObj.groupAdmin._id.toString()
-  );
+  const io = req.app.get("io");
+
+io.to(chat.toString()).emit("group_renamed", fullGroupChat);
+
+fullGroupChat.members.forEach((member) => {
+  io.to(member._id.toString()).emit("group_renamed", fullGroupChat);
+});
   res
     .status(200)
-    .json(new ApiResponse(200, chatObj, "name change successfully"));
+    .json(new ApiResponse(200, fullGroupChat, "name change successfully"));
 });
 
-export { accesschat, fetchchats, creategroupchat, renameGroup };
+const removefromgroup = asynchandler(async (req, res) => {
+  const { chat, userid } = req.body;
+
+  if (!chat) {
+    throw new Apierror(404, "Chat not found");
+  }
+
+  if (!userid) {
+    throw new Apierror(404, "User not found");
+  }
+
+  const chatData = await Chat.findById(chat);
+
+  if (!chatData) {
+    throw new Apierror(404, "Chat not found");
+  }
+
+  if (!chatData.members.includes(userid)) {
+    throw new Apierror(400, "User is not in the group");
+  }
+
+  if (chatData.groupAdmin.toString() === userid) {
+    throw new Apierror(400, "Admin cannot be removed");
+  }
+
+  if (
+    chatData.groupAdmin.toString() !== req.user._id.toString() &&
+    userid !== req.user._id.toString()
+  ) {
+    throw new Apierror(403, "Only admin can remove others");
+  }
+
+  const updatedChat = await Chat.findByIdAndUpdate(
+    chat,
+    {
+      $pull: { members: userid },
+    },
+    { new: true }
+  )
+    .populate("members", "-password")
+    .populate("groupAdmin", "-password");
+
+  if (!updatedChat) {
+    throw new Apierror(404, "Chat not found");
+  }
+  const io = req.app.get("io");
+
+  if (userid === req.user._id.toString()) {
+    io.to(chat).emit("left_group", {
+      chatId: chat,
+      userId: userid,
+    });
+  } else {
+    io.to(chat).emit("kicked_from_group", {
+      chatId: chat,
+      userId: userid,
+    });
+
+    io.to(userid).emit("removed_from_group", {
+      chatId: chat,
+    });
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, updatedChat, "User removed from group"));
+});
+
+const addtogroup = asynchandler(async (req, res) => {
+  const { userid, chat } = req.body;
+
+  if (!chat) {
+    throw new Apierror(404, "Chat not found");
+  }
+
+  if (!userid) {
+    throw new Apierror(404, "User not found");
+  }
+
+  const chatData = await Chat.findById(chat);
+
+  if (!chatData) {
+    throw new Apierror(404, "Chat not found");
+  }
+
+  if (chatData.members.includes(userid)) {
+    throw new Apierror(400, "User is already in the group");
+  }
+  if (chatData.groupAdmin.toString() !== req.user._id.toString()) {
+    throw new Apierror(403, "Only admin can add users");
+  }
+
+  const updatedChat = await Chat.findByIdAndUpdate(
+    chat,
+     {
+$addToSet: {
+  members: userid
+}    },
+    { new: true }
+  )
+    .populate("members", "-password")
+    .populate("groupAdmin", "-password");
+
+  if (!updatedChat) {
+    throw new Apierror(404, "Chat not found");
+  }
+    const io = req.app.get("io");
+
+  io.to(chat).emit("user_added", {
+    chatId: chat,
+    userId: userid,
+  });
+
+io.to(userid).emit("added_to_group", updatedChat);
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, updatedChat, "User added to group"));
+});
+
+export { accesschat, fetchchats, creategroupchat, renameGroup,removefromgroup,addtogroup };

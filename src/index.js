@@ -45,7 +45,7 @@ socket.on("get_online_users", () => {
       });
       socket.on("leave_chat", (chatId) => {
         socket.leave(chatId);
-        console.log("LEFT:", chatId);
+        // console.log("LEFT:", chatId);
       });
 
       socket.on("typing", ({ chatId, userId }) => {
