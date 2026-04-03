@@ -254,26 +254,22 @@ const creategroupchat = asynchandler(async (req, res) => {
     joinedAt: new Date(),
   }))
 );
-  const fullGroupChat = await Chat.findById(groupchat._id)
-    .populate("members", "-password -refreshtoken")
-    .populate("groupAdmin", "-password -refreshtoken");
 
-  let chatObj = fullGroupChat.toObject();
+    const fullGroupChat = await Chat.findById(groupchat._id)
+  .populate("members", "-password -refreshtoken")
+  .populate("groupAdmin", "-password -refreshtoken");
 
-  chatObj.members = chatObj.members.filter(
-    (member) => member._id.toString() !== chatObj.groupAdmin._id.toString()
-  );
+const io = req.app.get("io");
 
-  const io = req.app.get("io");
+uniqueMembers.forEach((memberId) => {
+  if (memberId.toString() !== req.user._id.toString()) {
+    io.to(memberId.toString()).emit("group_created", fullGroupChat);
+  }
+});
 
-  uniqueMembers.forEach((memberId) => {
-    if (memberId.toString() !== req.user._id.toString()) {
-      io.to(memberId.toString()).emit("group_created", chatObj);
-    }
-  });
-  res
-    .status(201)
-    .json(new ApiResponse(201, chatObj, "Group created successfully"));
+res
+  .status(201)
+  .json(new ApiResponse(201, fullGroupChat, "Group created successfully"));
 });
 
 const renameGroup = asynchandler(async (req, res) => {
