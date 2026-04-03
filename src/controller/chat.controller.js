@@ -3,6 +3,7 @@ import { Chat } from "../models/chat.model.js";
 import { Apierror } from "../utils/apierror.js";
 import { asynchandler } from "../utils/asynchandler.js";
 import { ApiResponse } from "../utils/apiresponse.js";
+import { ChatMember } from "../models/chatmembers.js";
 
 const accesschat = asynchandler(async (req, res) => {
   const { userid } = req.body;
@@ -83,6 +84,10 @@ const accesschat = asynchandler(async (req, res) => {
   const newChat = await Chat.create({
     members: [req.user._id, userid],
   });
+  await ChatMember.create([
+  { chat: newChat._id, user: req.user._id },
+  { chat: newChat._id, user: userid },
+]);
 
   const createdChat = await Chat.aggregate([
     {
@@ -242,6 +247,13 @@ const creategroupchat = asynchandler(async (req, res) => {
     members: uniqueMembers,
     groupAdmin: req.user._id,
   });
+  await ChatMember.insertMany(
+  uniqueMembers.map((memberId) => ({
+    chat: groupchat._id,
+    user: memberId,
+    joinedAt: new Date(),
+  }))
+);
   const fullGroupChat = await Chat.findById(groupchat._id)
     .populate("members", "-password -refreshtoken")
     .populate("groupAdmin", "-password -refreshtoken");
@@ -362,6 +374,10 @@ const removefromgroup = asynchandler(async (req, res) => {
     .populate("members", "-password")
     .populate("groupAdmin", "-password");
 
+    await ChatMember.deleteOne({
+  chat: chat,
+  user: userid,
+});
   if (!updatedChat) {
     throw new Apierror(404, "Chat not found");
   }
@@ -422,6 +438,12 @@ $addToSet: {
   )
     .populate("members", "-password")
     .populate("groupAdmin", "-password");
+
+    await ChatMember.create({
+  chat: chat,
+  user: userid,
+  joinedAt: new Date(),
+});
 
   if (!updatedChat) {
     throw new Apierror(404, "Chat not found");

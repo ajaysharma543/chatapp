@@ -5,6 +5,7 @@ import { Apierror } from "../utils/apierror.js";
 import { ApiResponse } from "../utils/apiresponse.js";
 import { asynchandler } from "../utils/asynchandler.js";
 import { uploaodoncloudinary } from "../utils/cloudinary.js";
+import { ChatMember } from "../models/chatmembers.js";
 
 const sendmessage = asynchandler(async (req, res) => {
   const { content, chat } = req.body;
@@ -139,14 +140,21 @@ const allmessages = asynchandler(async (req, res) => {
   if (!chatId) {
     throw new Apierror(404, "chatId not found");
   }
+ const member = await ChatMember.findOne({
+    chat: chatId,
+    user: req.user._id,
+  });
 
+  if (!member) {
+    throw new Apierror(403, "You are not part of this chat");
+  }
   const messages = await Message.aggregate([
     {
       $match: {
         chat: new mongoose.Types.ObjectId(chatId),
+        createdAt: { $gte: member.joinedAt },
       },
     },
-
     {
       $lookup: {
         from: "users",
