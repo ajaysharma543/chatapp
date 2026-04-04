@@ -9,7 +9,6 @@ import {
   refreshAccesstoken,
   registeruser,
   removeavatar,
-  
 } from "../controller/user.controller.js";
 
 import { upload } from "../middlewares/multer.middleware.js";
@@ -33,18 +32,14 @@ router.route("/login").post(loginuser);
 router.route("/logout").post(verifyjwt, logout);
 router.route("/refreshtoken").post(refreshAccesstoken);
 
-
 router.route("/getcurrentuser").get(verifyjwt, getCurrentUser);
 router.route("/getallusers").get(verifyjwt, getallusers);
 
-
 router.route("/update-profile").patch(verifyjwt, changeaccountdetails);
 
-router.route("/change-avatar").patch(
-  verifyjwt,
-  upload.single("avatar"),
-  changeuseravatar
-);
+router
+  .route("/change-avatar")
+  .patch(verifyjwt, upload.single("avatar"), changeuseravatar);
 router.route("/remove-avatar").patch(verifyjwt, removeavatar);
 
 export default router;

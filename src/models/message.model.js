@@ -10,9 +10,12 @@ const messageSchema = new Schema(
       type: String,
       trim: true,
     },
-    isdeleted: {
+    isDeleted: {
       type: Boolean,
       default: false,
+    },
+    deletedAt: {
+      type: Date,
     },
     readby: [
       {

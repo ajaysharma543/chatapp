@@ -85,9 +85,9 @@ const accesschat = asynchandler(async (req, res) => {
     members: [req.user._id, userid],
   });
   await ChatMember.create([
-  { chat: newChat._id, user: req.user._id },
-  { chat: newChat._id, user: userid },
-]);
+    { chat: newChat._id, user: req.user._id },
+    { chat: newChat._id, user: userid },
+  ]);
 
   const createdChat = await Chat.aggregate([
     {
@@ -248,28 +248,28 @@ const creategroupchat = asynchandler(async (req, res) => {
     groupAdmin: req.user._id,
   });
   await ChatMember.insertMany(
-  uniqueMembers.map((memberId) => ({
-    chat: groupchat._id,
-    user: memberId,
-    joinedAt: new Date(),
-  }))
-);
+    uniqueMembers.map((memberId) => ({
+      chat: groupchat._id,
+      user: memberId,
+      joinedAt: new Date(),
+    }))
+  );
 
-    const fullGroupChat = await Chat.findById(groupchat._id)
-  .populate("members", "-password -refreshtoken")
-  .populate("groupAdmin", "-password -refreshtoken");
+  const fullGroupChat = await Chat.findById(groupchat._id)
+    .populate("members", "-password -refreshtoken")
+    .populate("groupAdmin", "-password -refreshtoken");
 
-const io = req.app.get("io");
+  const io = req.app.get("io");
 
-uniqueMembers.forEach((memberId) => {
-  if (memberId.toString() !== req.user._id.toString()) {
-    io.to(memberId.toString()).emit("group_created", fullGroupChat);
-  }
-});
+  uniqueMembers.forEach((memberId) => {
+    if (memberId.toString() !== req.user._id.toString()) {
+      io.to(memberId.toString()).emit("group_created", fullGroupChat);
+    }
+  });
 
-res
-  .status(201)
-  .json(new ApiResponse(201, fullGroupChat, "Group created successfully"));
+  res
+    .status(201)
+    .json(new ApiResponse(201, fullGroupChat, "Group created successfully"));
 });
 
 const renameGroup = asynchandler(async (req, res) => {
@@ -313,16 +313,22 @@ const renameGroup = asynchandler(async (req, res) => {
 
   const fullGroupChat = await Chat.findById(updatedgroupchat._id)
     .populate("members", "-password -refreshtoken")
-    .populate("groupAdmin", "-password -refreshtoken");
-
+    .populate("groupAdmin", "-password -refreshtoken")
+    .populate({
+      path: "lastMessage",
+      populate: {
+        path: "sender",
+        select: "fullname avatar",
+      },
+    });
 
   const io = req.app.get("io");
 
-io.to(chat.toString()).emit("group_renamed", fullGroupChat);
+  io.to(chat.toString()).emit("group_renamed", fullGroupChat);
 
-fullGroupChat.members.forEach((member) => {
-  io.to(member._id.toString()).emit("group_renamed", fullGroupChat);
-});
+  fullGroupChat.members.forEach((member) => {
+    io.to(member._id.toString()).emit("group_renamed", fullGroupChat);
+  });
   res
     .status(200)
     .json(new ApiResponse(200, fullGroupChat, "name change successfully"));
@@ -370,10 +376,10 @@ const removefromgroup = asynchandler(async (req, res) => {
     .populate("members", "-password")
     .populate("groupAdmin", "-password");
 
-    await ChatMember.deleteOne({
-  chat: chat,
-  user: userid,
-});
+  await ChatMember.deleteOne({
+    chat: chat,
+    user: userid,
+  });
   if (!updatedChat) {
     throw new Apierror(404, "Chat not found");
   }
@@ -426,36 +432,44 @@ const addtogroup = asynchandler(async (req, res) => {
 
   const updatedChat = await Chat.findByIdAndUpdate(
     chat,
-     {
-$addToSet: {
-  members: userid
-}    },
+    {
+      $addToSet: {
+        members: userid,
+      },
+    },
     { new: true }
   )
     .populate("members", "-password")
     .populate("groupAdmin", "-password");
 
-    await ChatMember.create({
-  chat: chat,
-  user: userid,
-  joinedAt: new Date(),
-});
+  await ChatMember.create({
+    chat: chat,
+    user: userid,
+    joinedAt: new Date(),
+  });
 
   if (!updatedChat) {
     throw new Apierror(404, "Chat not found");
   }
-    const io = req.app.get("io");
+  const io = req.app.get("io");
 
   io.to(chat).emit("user_added", {
     chatId: chat,
     userId: userid,
   });
 
-io.to(userid).emit("added_to_group", updatedChat);
+  io.to(userid).emit("added_to_group", updatedChat);
 
   res
     .status(200)
     .json(new ApiResponse(200, updatedChat, "User added to group"));
 });
 
-export { accesschat, fetchchats, creategroupchat, renameGroup,removefromgroup,addtogroup };
+export {
+  accesschat,
+  fetchchats,
+  creategroupchat,
+  renameGroup,
+  removefromgroup,
+  addtogroup,
+};

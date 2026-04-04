@@ -3,7 +3,10 @@ import { User } from "../models/user.model.js";
 import { Apierror } from "../utils/apierror.js";
 import { ApiResponse } from "../utils/apiresponse.js";
 import { asynchandler } from "../utils/asynchandler.js";
-import { deleteOnCloudinary, uploaodoncloudinary } from "../utils/cloudinary.js";
+import {
+  deleteOnCloudinary,
+  uploaodoncloudinary,
+} from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 
 const registeruser = asynchandler(async (req, res) => {
@@ -160,13 +163,11 @@ const logout = asynchandler(async (req, res) => {
 });
 
 const getCurrentUser = asynchandler(async (req, res) => {
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      { user: req.user },
-      "User fetched successfully"
-    )
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { user: req.user }, "User fetched successfully")
+    );
 });
 const refreshAccesstoken = asynchandler(async (req, res) => {
   const incomingRefreshtoken =
@@ -268,11 +269,16 @@ const changeuseravatar = asynchandler(async (req, res) => {
     }
   }
 
-return res.status(200).json(
-  new ApiResponse(200, { user: updatedavatar }, "Avatar updated successfully")
-);
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { user: updatedavatar },
+        "Avatar updated successfully"
+      )
+    );
 });
-
 
 const changeaccountdetails = asynchandler(async (req, res) => {
   const { fullname, username, email, bio, gender } = req.body;
@@ -304,12 +310,18 @@ const changeaccountdetails = asynchandler(async (req, res) => {
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,
     { $set: updateFields },
-    { new: true, runValidators: true } 
+    { new: true, runValidators: true }
   ).select("-password");
 
-  return res.status(200).json(
-   new ApiResponse(200, { user: updatedUser }, "Profile updated successfully")
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { user: updatedUser },
+        "Profile updated successfully"
+      )
+    );
 });
 
 const removeavatar = asynchandler(async (req, res) => {
@@ -335,16 +347,22 @@ const removeavatar = asynchandler(async (req, res) => {
       $set: {
         avatar: {
           public_id: "",
-          url: ""
-        }
-      }
+          url: "",
+        },
+      },
     },
     { new: true, runValidators: false }
   ).select("-password");
 
-  return res.status(200).json(
-    new ApiResponse(200, { user: updatedavatar }, "Avatar removed successfully")
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { user: updatedavatar },
+        "Avatar removed successfully"
+      )
+    );
 });
 
 export {
@@ -356,5 +374,5 @@ export {
   getallusers,
   changeuseravatar,
   changeaccountdetails,
-  removeavatar
+  removeavatar,
 };

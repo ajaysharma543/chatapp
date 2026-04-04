@@ -20,15 +20,15 @@ const userSchema = new Schema(
       default: null,
     },
     bio: {
-  type: String,
-  default: "",
-},
+      type: String,
+      default: "",
+    },
 
-gender: {
-  type: String,
-  enum: ["male", "female", "other"],
-  default: null,
-},
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      default: null,
+    },
     email: {
       type: String,
       required: true,

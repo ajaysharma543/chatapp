@@ -25,7 +25,6 @@ const uploaodoncloudinary = async (localpath) => {
   }
 };
 
-
 const deleteOnCloudinary = async function (public_id, resource_type = "image") {
   try {
     if (!public_id) return null;
@@ -43,4 +42,4 @@ const deleteOnCloudinary = async function (public_id, resource_type = "image") {
   }
 };
 
-export { uploaodoncloudinary,deleteOnCloudinary };
+export { uploaodoncloudinary, deleteOnCloudinary };

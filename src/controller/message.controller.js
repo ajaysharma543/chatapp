@@ -110,25 +110,25 @@ const sendmessage = asynchandler(async (req, res) => {
       },
     },
   ]);
-const io = req.app.get("io");
+  const io = req.app.get("io");
 
-const chatId = messageData[0].chat._id.toString();
+  const chatId = messageData[0].chat._id.toString();
 
-io.to(chatId).emit("new_message", messageData[0]);
+  io.to(chatId).emit("new_message", messageData[0]);
 
-messageData[0].chat.members.forEach((member) => {
-  const memberId = member._id.toString();
-  const senderId = req.user._id.toString();
+  messageData[0].chat.members.forEach((member) => {
+    const memberId = member._id.toString();
+    const senderId = req.user._id.toString();
 
-  if (memberId === senderId) return;
+    if (memberId === senderId) return;
 
-  io.to(memberId).emit("new_message", messageData[0]);
+    io.to(memberId).emit("new_message", messageData[0]);
 
-  io.to(memberId).emit("new_notification", {
-    sender: messageData[0].sender,
-    message: messageData[0],
+    io.to(memberId).emit("new_notification", {
+      sender: messageData[0].sender,
+      message: messageData[0],
+    });
   });
-});
   res
     .status(200)
     .json(new ApiResponse(200, messageData[0], "message created successfully"));
@@ -140,7 +140,7 @@ const allmessages = asynchandler(async (req, res) => {
   if (!chatId) {
     throw new Apierror(404, "chatId not found");
   }
- const member = await ChatMember.findOne({
+  const member = await ChatMember.findOne({
     chat: chatId,
     user: req.user._id,
   });
@@ -200,6 +200,7 @@ const allmessages = asynchandler(async (req, res) => {
         content: 1,
         createdAt: 1,
         readby: 1,
+        isDeleted: 1,
         image: 1,
         readby: {
           _id: 1,
@@ -234,7 +235,13 @@ const allmessages = asynchandler(async (req, res) => {
 
   res
     .status(200)
-    .json(new ApiResponse(200, { messages }, "all messages fetched"));
+    .json(
+      new ApiResponse(
+        200,
+        { messages: Array.isArray(messages) ? messages : [] },
+        "all messages fetched"
+      )
+    );
 });
 
 const markasread = asynchandler(async (req, res) => {
@@ -274,48 +281,94 @@ const markasread = asynchandler(async (req, res) => {
 });
 
 const deletemessage = asynchandler(async (req, res) => {
-  const messageId = req.params.messageId;
+  const { messageId } = req.params;
 
   if (!messageId) {
-    throw new Apierror(400, "message id not provided");
+    throw new Apierror(400, "Message ID not provided");
   }
 
   const message = await Message.findById(messageId);
 
   if (!message) {
-    throw new Apierror(404, "message not found");
+    throw new Apierror(404, "Message not found");
   }
 
-  if (message.sender.toString() !== req.user?._id.toString()) {
-    throw new Apierror(403, "you can delete only your own message");
+  if (message.sender.toString() !== req.user._id.toString()) {
+    throw new Apierror(403, "You can delete only your own message");
   }
 
-  await Message.findByIdAndDelete(messageId);
+  if (message.isDeleted) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "Message already deleted"));
+  }
 
-  const latestMessage = await Message.findOne({ chat: message.chat }).sort({
-    createdAt: -1,
-  });
+  const chatId = message.chat;
 
-  await Chat.findByIdAndUpdate(message.chat, {
-    lastMessage: latestMessage?._id || null,
-  });
+  const currentLastMessage = await Message.findOne({
+    chat: chatId,
+    isDeleted: { $ne: true },
+  }).sort({ createdAt: -1 });
 
-  if (req.io) {
-    req.io.to(message.chat.toString()).emit("message_deleted", {
-      messageId: message._id.toString(),
-      chatId: message.chat.toString(),
-    });
-    chat.members.forEach((member) => {
-      req.io.to(member._id.toString()).emit("message_deleted", {
-        messageId: message._id.toString(),
-        chatId: message.chat.toString(),
+  const isLastMessage =
+    currentLastMessage?._id.toString() === messageId.toString();
+
+  await Message.updateOne(
+    { _id: messageId },
+    {
+      $set: {
+        isDeleted: true,
+        deletedAt: new Date(),
+      },
+    }
+  );
+
+  let finalLastMessage = null;
+
+  if (isLastMessage) {
+    finalLastMessage = {
+      _id: message._id,
+      content: "This message was deleted",
+      isDeleted: true,
+      sender: message.sender,
+      createdAt: message.createdAt,
+    };
+  } else {
+    finalLastMessage = await Message.findOne({
+      chat: chatId,
+      isDeleted: { $ne: true },
+    })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "sender",
+        select: "fullname avatar",
       });
-    });
   }
-  // console.log("EMITTED DELETE TO CHAT:", message.chat.toString());
+
+  await Chat.findByIdAndUpdate(chatId, {
+    lastMessage: finalLastMessage?._id || null,
+  });
+
+  const chat = await Chat.findById(chatId).select("members");
+  const io = req.app.get("io");
+
+  chat.members.forEach((member) => {
+    const wasUnread = !(message.readby || []).some(
+      (u) => u.toString() === member.toString()
+    );
+
+    io.to(member.toString()).emit("message_deleted", {
+      messageId: messageId,
+      chatId: chatId.toString(),
+      lastMessage: finalLastMessage,
+      isLastMessageDeleted: isLastMessage,
+      wasUnread,
+    });
+  });
+
   return res
     .status(200)
-    .json(new ApiResponse(200, null, "message deleted successfully"));
+    .json(new ApiResponse(200, null, "Message deleted successfully"));
 });
 
 export { sendmessage, allmessages, markasread, deletemessage };
