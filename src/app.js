@@ -15,7 +15,9 @@ app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
-
+app.get('/api/v1/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 import router from "./routes/user.routes.js";
 import messagerouter from "./routes/message.routes.js";
 import chatrouter from "./routes/caht.routes.js";
